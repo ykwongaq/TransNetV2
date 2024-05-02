@@ -7,12 +7,14 @@ import argparse
 from transnetv2 import TransNetV2
 import time
 
+
 def clear_dir_contents(dir_path):
     # Clear files in dir_path
     for file_name in os.listdir(dir_path):
         file_path = os.path.join(dir_path, file_name)
         if os.path.isfile(file_path):
             os.remove(file_path)
+
 
 def main(args):
     video_folder = args.dir
@@ -24,11 +26,10 @@ def main(args):
 
     failing_video = []
 
-    for video_filename in os.listdir( video_folder):
+    for video_filename in os.listdir(video_folder):
         if not video_filename.endswith(".mp4"):
             continue
-        
-        
+
         video_path = os.path.join(video_folder, video_filename)
         start_time = time.time()
         _, single_frame_predictions, _ = model.predict_video(video_path)
@@ -50,7 +51,7 @@ def main(args):
 
         print(f"Saving scenes to {output_path}...")
         with open(output_path, "w") as f:
-            for (start_frame, end_frame) in scenes:
+            for start_frame, end_frame in scenes:
                 f.write(f"{start_frame} {end_frame}\n")
 
         # for idx, (start_frame, end_frame) in enumerate(scenes):
@@ -60,7 +61,7 @@ def main(args):
         #     os.makedirs(output_video_folder, exist_ok=True)
         #     clear_dir_contents(output_video_folder)
         #     # Clear files in video_output_folder
-            
+
         #     # Save frames
         #     print(f"Saving frames to {output_video_folder}...")
         #     try:
@@ -77,11 +78,21 @@ def main(args):
         print(f"Failed to process {len(failing_video)} videos:")
         for video_path in failing_video:
             print(video_path)
-        
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dir", type=str, default="../video", help="path to video folder to process")
-    parser.add_argument("--output", type=str, default="../video_output", help="path to output folder")
-    parser.add_argument("--weights", type=str, default=None, help="path to TransNet V2 weights, tries to infer the location if not specified")
+    parser.add_argument(
+        "--dir", type=str, default="../video", help="path to video folder to process"
+    )
+    parser.add_argument(
+        "--output", type=str, default="../video_output", help="path to output folder"
+    )
+    parser.add_argument(
+        "--weights",
+        type=str,
+        default=None,
+        help="path to TransNet V2 weights, tries to infer the location if not specified",
+    )
     args = parser.parse_args()
     main(args)
