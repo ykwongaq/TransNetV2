@@ -79,13 +79,16 @@ class TransNetV2:
                                       "individual frames from video file. Install `ffmpeg` command line tool and then "
                                       "install python wrapper by `pip install ffmpeg-python`.")
 
-        print("[TransNetV2] Extracting frames from {}".format(video_fn))
-        video_stream, err = ffmpeg.input(video_fn).output(
-            "pipe:", format="rawvideo", pix_fmt="rgb24", s="48x27"
-        ).run(capture_stdout=True, capture_stderr=True)
+        try:
+            video_stream, err = ffmpeg.input(video_fn).output(
+                "pipe:", format="rawvideo", pix_fmt="rgb24", s="48x27"
+            ).run(capture_stdout=True, capture_stderr=True)
 
-        video = np.frombuffer(video_stream, np.uint8).reshape([-1, 27, 48, 3])
-        return (video, *self.predict_frames(video))
+            video = np.frombuffer(video_stream, np.uint8).reshape([-1, 27, 48, 3])
+            return (video, *self.predict_frames(video))
+        except ffmpeg.Error as exc:
+            print(f"[TransNetV2] Error while extracting frames from {video_fn} with error message {exc.stderr.decode()}.")
+            return None, None, None
 
     @staticmethod
     def predictions_to_scenes(predictions: np.ndarray, threshold: float = 0.5):
