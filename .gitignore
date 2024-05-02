@@ -8,3 +8,6 @@
 video/
 video_output/
 .vscode/
+build/
+transnetv2.egg-info/
+dist/
