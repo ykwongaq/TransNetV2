@@ -45,33 +45,34 @@ def main(args):
         scenes = model.predictions_to_scenes(single_frame_predictions)
         scenes = scenes.tolist()
 
-        video_filename = video_filename.split(".")[0] + ".txt"
-        output_path = os.path.join(args.output, video_filename)
         os.makedirs(args.output, exist_ok=True)
+        for idx, (start_frame, end_frame) in enumerate(scenes):
+            video_name = video_filename.split(".")[0]
+            video_name = f"{video_name}_{idx}"
+            output_video_folder = os.path.join(args.output, video_name)
+            os.makedirs(output_video_folder, exist_ok=True)
 
-        print(f"Saving scenes to {output_path}...")
-        with open(output_path, "w") as f:
-            for start_frame, end_frame in scenes:
-                f.write(f"{start_frame} {end_frame}\n")
+            # Clear files in video_output_folder
+            clear_dir_contents(output_video_folder)
 
-        # for idx, (start_frame, end_frame) in enumerate(scenes):
-        #     video_name = video_filename.split(".")[0]
-        #     video_name = f"{video_name}_{idx}"
-        #     output_video_folder = os.path.join(args.output, video_name)
-        #     os.makedirs(output_video_folder, exist_ok=True)
-        #     clear_dir_contents(output_video_folder)
-        #     # Clear files in video_output_folder
-
-        #     # Save frames
-        #     print(f"Saving frames to {output_video_folder}...")
-        #     try:
-        #         stream = ffmpeg.input(video_path)
-        #         stream = ffmpeg.output(stream, f"{output_video_folder}/%06d.jpg", loglevel="quiet", start_number=0, vf=f'select=\'between(n,{start_frame},{end_frame})\'')
-        #         ffmpeg.run(stream, overwrite_output=True)
-        #     except Exception as e:
-        #         print(f"Failed to save frames for video {video_path} with error message: {e}")
-        #         failing_video.append(video_path)
-        #         continue
+            # Save frames
+            print(f"Saving frames to {output_video_folder}...")
+            try:
+                stream = ffmpeg.input(video_path)
+                stream = ffmpeg.output(
+                    stream,
+                    f"{output_video_folder}/%06d.jpg",
+                    loglevel="quiet",
+                    start_number=0,
+                    vf=f"select='between(n,{start_frame},{end_frame})'",
+                )
+                ffmpeg.run(stream, overwrite_output=True)
+            except Exception as e:
+                print(
+                    f"Failed to save frames for video {video_path} with error message: {e}"
+                )
+                failing_video.append(video_path)
+                continue
 
     print(f"Finished")
     if len(failing_video) > 0:
