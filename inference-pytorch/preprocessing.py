@@ -4,46 +4,64 @@ import argparse
 import shutil
 
 from tqdm import tqdm
+import time
+import ffmpeg
+import subprocess
+
+from concurrent.futures import ThreadPoolExecutor
 
 
-def preprocess_video(video_path, output_folder, max_frames=3000):
-
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    num_segments = total_frames // max_frames + (
-        1 if total_frames % max_frames != 0 else 0
+def split_segment(input_file, start_time, segment_duration, output_file):
+    ffmpeg.input(input_file, ss=start_time, t=segment_duration).output(output_file).run(
+        overwrite_output=True
     )
 
-    if num_segments == 1:
-        shutil.copy(video_path, output_folder)
+
+def preprocess_video(input_file, output_folder, frames_per_segment=3000):
+
+    # Get video info
+    probe = ffmpeg.probe(input_file)
+    video_stream = next(
+        (stream for stream in probe["streams"] if stream["codec_type"] == "video"), None
+    )
+
+    if video_stream is None:
+        raise Exception("No video stream found")
+
+    frame_rate = eval(
+        video_stream["r_frame_rate"]
+    )  # Convert frame rate string to float
+    duration = float(video_stream["duration"])  # Total duration of the video in seconds
+    total_frames = int(frame_rate * duration)  # Calculate total frames
+
+    if total_frames <= frames_per_segment:
+        # If the video is smaller than the segment size, copy the video file
+        shutil.copy(input_file, output_folder)
         return
 
-    print(f"Splitting video into {num_segments} segments")
-    for segment in range(num_segments):
-        output_file = os.path.join(
-            output_folder, f"{os.path.basename(video_path)}_{segment}.mp4"
-        )
-        out = cv2.VideoWriter(
-            output_file,
-            cv2.VideoWriter_fourcc(*"mp4v"),
-            fps,
-            (frame_width, frame_height),
-        )
+    segment_duration = (
+        frames_per_segment / frame_rate
+    )  # Duration of each segment in seconds
 
-        for frame_num in range(max_frames):
-            ret, frame = cap.read()
-            if not ret:
-                break
-            out.write(frame)
+    segment_count = total_frames // frames_per_segment + (
+        1 if total_frames % frames_per_segment else 0
+    )
 
-        out.release()
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for i in range(segment_count):
+            start_time = i * segment_duration
+            output_file = os.path.join(
+                output_folder, f"{os.path.basename(input_file)}_{i:03d}.mp4"
+            )
+            futures.append(
+                executor.submit(
+                    split_segment, input_file, start_time, segment_duration, output_file
+                )
+            )
 
-    cap.release()
+        for future in futures:
+            future.result()  # Wait for all threads to complete
 
 
 def main(args):
@@ -62,6 +80,7 @@ def main(args):
     os.makedirs(output_folder)
 
     for video_filename in os.listdir(input_folder):
+
         print(f"Preprocessing video: {video_filename}")
         video_path = os.path.join(input_folder, video_filename)
         preprocess_video(video_path, output_folder, max_frames)
