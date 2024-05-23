@@ -12,9 +12,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 def split_segment(input_file, start_time, segment_duration, output_file):
-    ffmpeg.input(input_file, ss=start_time, t=segment_duration).output(output_file).run(
-        overwrite_output=True
-    )
+    ffmpeg.input(input_file, ss=start_time, t=segment_duration).output(
+        output_file
+    ).global_args("-loglevel", "error").run(overwrite_output=True)
 
 
 def preprocess_video(input_file, output_folder, frames_per_segment=3000):
@@ -34,11 +34,6 @@ def preprocess_video(input_file, output_folder, frames_per_segment=3000):
     duration = float(video_stream["duration"])  # Total duration of the video in seconds
     total_frames = int(frame_rate * duration)  # Calculate total frames
 
-    if total_frames <= frames_per_segment:
-        # If the video is smaller than the segment size, copy the video file
-        shutil.copy(input_file, output_folder)
-        return
-
     segment_duration = (
         frames_per_segment / frame_rate
     )  # Duration of each segment in seconds
@@ -47,12 +42,20 @@ def preprocess_video(input_file, output_folder, frames_per_segment=3000):
         1 if total_frames % frames_per_segment else 0
     )
 
-    with ThreadPoolExecutor() as executor:
+    if segment_count == 1:
+        output_file = os.path.join(output_folder, f"{os.path.basename(input_file)}")
+        shutil.copy(input_file, output_file)
+        return
+
+    print(f"Splitting video into {segment_count} segments")
+    num_workers = args.num_workers
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = []
         for i in range(segment_count):
             start_time = i * segment_duration
             output_file = os.path.join(
-                output_folder, f"{os.path.basename(input_file)}_{i:03d}.mp4"
+                output_folder,
+                f"{os.path.splitext(os.path.basename(input_file))[0]}_{i:03d}.mp4",
             )
             futures.append(
                 executor.submit(
@@ -100,6 +103,9 @@ if __name__ == "__main__":
         type=int,
         default=3000,
         help="Maximum number of frames to be extracted. Default 3000",
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=4, help="Number of workers. Default 4"
     )
     args = parser.parse_args()
     main(args)
