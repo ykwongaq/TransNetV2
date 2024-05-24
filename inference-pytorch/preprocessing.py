@@ -1,50 +1,66 @@
-import cv2
 import os
 import argparse
 import shutil
+import ffmpeg
 
 from tqdm import tqdm
 
 
-def preprocess_video(video_path, output_folder, max_frames=3000):
-
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    num_segments = total_frames // max_frames + (
-        1 if total_frames % max_frames != 0 else 0
+def get_video_metadata(video_path):
+    probe = ffmpeg.probe(video_path)
+    video_stream = next(
+        stream for stream in probe["streams"] if stream["codec_type"] == "video"
     )
+    duration = float(video_stream["duration"])
+    frame_rate = eval(video_stream["r_frame_rate"])
+    return duration, frame_rate
 
-    if num_segments == 1:
-        shutil.copy(video_path, output_folder)
+
+def preprocess_video(video_path, output_dir, frames_per_chunk):
+    # Get the video duration and frame rate
+    duration, frame_rate = get_video_metadata(video_path)
+
+    # Calculate the chunk duration
+    chunk_duration = frames_per_chunk / frame_rate
+    num_chunks = int(duration / chunk_duration)
+
+    if num_chunks == 1:
+        # If the video is shorter than the chunk duration, just copy the video
+        output_path = os.path.join(output_dir, os.path.basename(video_path))
+        shutil.copyfile(video_path, output_path)
         return
 
-    print(f"Splitting video into {num_segments} segments")
-    for segment in range(num_segments):
-        output_file = os.path.join(
-            output_folder,
-            f"{os.path.splitext(os.path.basename(video_path))[0]}_{segment}.mp4",
+    print(f"Splitting video into {num_chunks} chunks")
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get the original video name without the extension
+    original_name = os.path.splitext(os.path.basename(video_path))[0]
+
+    # Split the video into chunks
+    for i in range(num_chunks):
+        print(f"Processing chunk {i+1}/{num_chunks}")
+        start_time = i * chunk_duration
+        output_path = os.path.join(output_dir, f"{original_name}_{i}.mp4")
+        (
+            ffmpeg.input(video_path, ss=start_time, t=chunk_duration)
+            .output(output_path)
+            .global_args("-loglevel", "error")
+            .run()  # Show only error messages
         )
-        out = cv2.VideoWriter(
-            output_file,
-            cv2.VideoWriter_fourcc(*"mp4v"),
-            fps,
-            (frame_width, frame_height),
+
+    # Handle the last chunk if there's remaining video
+    remaining_duration = duration - num_chunks * chunk_duration
+    if remaining_duration > 0:
+        print(f"Processing chunk {num_chunks}/{num_chunks}")
+        start_time = num_chunks * chunk_duration
+        output_path = os.path.join(output_dir, f"{original_name}_{num_chunks}.mp4")
+        (
+            ffmpeg.input(video_path, ss=start_time, t=remaining_duration)
+            .output(output_path)
+            .global_args("-loglevel", "error")
+            .run()  # Show only error messages
         )
-
-        for frame_num in range(max_frames):
-            ret, frame = cap.read()
-            if not ret:
-                break
-            out.write(frame)
-
-        out.release()
-
-    cap.release()
 
 
 def main(args):
