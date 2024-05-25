@@ -2,6 +2,8 @@ import os
 import argparse
 import shutil
 import ffmpeg
+import time
+import math
 
 from tqdm import tqdm
 
@@ -30,7 +32,7 @@ def preprocess_video(video_path, output_dir, frames_per_chunk):
         shutil.copyfile(video_path, output_path)
         return
 
-    print(f"Splitting video into {num_chunks} chunks")
+    print(f"Splitting video into {math.ceil(duration / chunk_duration)} chunks")
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
 
@@ -39,7 +41,7 @@ def preprocess_video(video_path, output_dir, frames_per_chunk):
 
     # Split the video into chunks
     for i in range(num_chunks):
-        print(f"Processing chunk {i+1}/{num_chunks}")
+        print(f"Processing chunk {i}/{num_chunks}")
         start_time = i * chunk_duration
         output_path = os.path.join(output_dir, f"{original_name}_{i}.mp4")
         (
@@ -74,14 +76,15 @@ def main(args):
 
     output_folder = args.output
 
-    if os.path.exists(output_folder):
-        shutil.rmtree(output_folder)
-    os.makedirs(output_folder)
+    os.makedirs(output_folder, exist_ok=True)
 
     for video_filename in os.listdir(input_folder):
         print(f"Preprocessing video: {video_filename}")
         video_path = os.path.join(input_folder, video_filename)
+        start_time = time.time()
         preprocess_video(video_path, output_folder, max_frames)
+        end_time = time.time()
+        print(f"Video preprocessed in {end_time - start_time:.2f} seconds")
     print("All video is processed.")
 
 
@@ -96,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_frames",
         type=int,
-        default=3000,
+        default=500,
         help="Maximum number of frames to be extracted. Default 3000",
     )
     args = parser.parse_args()
