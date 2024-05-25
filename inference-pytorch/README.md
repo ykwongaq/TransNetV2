@@ -20,22 +20,75 @@ python convert_weights.py [--test]
 ```
 The pytorch weights are saved into *transnetv2-pytorch-weights.pth* file.
 
-### ADVANCED USAGE
+### Split Video
 
-```python
-import torch
-from transnetv2_pytorch import TransNetV2
+To split a video into segments, you need to run four Python scripts.
 
-model = TransNetV2()
-state_dict = torch.load("transnetv2-pytorch-weights.pth")
-model.load_state_dict(state_dict)
-model.eval().cuda()
+#### Step 1: Prepare dataset
 
-with torch.no_grad():
-    # shape: batch dim x video frames x frame height x frame width x RGB (not BGR) channels
-    input_video = torch.zeros(1, 100, 27, 48, 3, dtype=torch.uint8)
-    single_frame_pred, all_frame_pred = model(input_video.cuda())
-    
-    single_frame_pred = torch.sigmoid(single_frame_pred).cpu().numpy()
-    all_frame_pred = torch.sigmoid(all_frame_pred["many_hot"]).cpu().numpy()
+First, gather all your video (.mp4) files into a single folder, such as `./video`.
+
+It is advisable to process your videos in batches to avoid issues that may occur mid-process. For example, you could process 20 videos at a time.
+
+#### Step 2: Preprocessing
+
+To prevent CUDA out-of-memory errors, split the video into smaller segments as a preprocessing step.
+
+Please run the `preprocessing.py` with the following input:
+
+```bash
+python preprocessing.py --input {path to video folder} --output {path to the output folder} --max_frames {maximum frames in each segment}
+```
+
+Here is an example
+```bash
+python preprocessing.py --input ./video --output ./video_preprocessed --max_frames 500
+```
+
+The default `max_frames` is 500
+
+#### Step 3: Generate Frames
+
+To optimize GPU usage, convert the preprocessed videos into frames (a sequence of images). These frames are intermediate products and can be deleted after the process is complete.
+
+Please run the `mp4_to_frames.py` with the following output:
+```bash
+python mp4_to_frames.py --input {path to preprocessed folder} --output {path to output folder}
+```
+
+Here is an example:
+```bash
+python mp4_to_frames.py --input ./video_preprocesssed --output ./video_frames
+```
+
+#### Step 4: Generate Splitting Frames
+
+Next, generate the splitting information, which includes the starting and ending frames for each segment. This information will be saved in text files.
+
+Please run the `split_video.py`:
+
+```bash
+python split_video.py --input {path to the frames folder} --output {path to the output folder}
+```
+
+Here is an example
+```bash
+python split_video.py --input ./video_frames --output ./video_splitting_info
+```
+
+
+#### Step 5: Generate Splitted Videos
+
+Finally, we can generate the splitted video and metajson using `gen_splitted_video.py`
+
+```bash
+python --input_video {path to the preprocessed folder} --input_split {path to the splitting info} --output {path to the output folder} --source {video source} --starting_idx {starting index of the output video}
+```
+
+`--source`  specifies the source of the video for metadata purposes.
+`--starting_idx` sets the naming start index for the output videos. The default is 0, so the first video will be named 00000000.mp4.
+
+Here is the example
+```bash
+python --input_video ./video_preprocessed --input_split ./video_splitting_info --output ./video_ouptut --source Youtube
 ```
