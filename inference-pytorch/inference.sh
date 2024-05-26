@@ -14,7 +14,7 @@ fi
 
 # Find and run all Python files in the directory
 echo ====================step1====================
-python ./preprocessing.py --input $input/video --output $output/video_preprocessed --max_frames $max_frames
+python ./preprocessing.py --input $input --output $output/video_preprocessed --max_frames $max_frames
 
 echo ====================step2====================
 python ./mp4_to_frames.py --input $output/video_preprocessed --output $output/video_frames

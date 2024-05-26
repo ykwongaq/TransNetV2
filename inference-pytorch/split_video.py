@@ -84,8 +84,8 @@ def main(args):
         if len(os.listdir(frame_folder)) == 0:
             print(f"Skipping {video_name} as the folder is empty")
             skipped_videos.append(video_name)
-            with open(error_message_path, "a") as f:
-                f.write(f"{video_name}: Empty folder\n")
+            # with open(error_message_path, "a") as f:
+            #     f.write(f"{video_name}: Empty folder\n")
             continue
 
         progress_bar.set_description(f"Processing {video_name}")

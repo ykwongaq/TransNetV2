@@ -33,10 +33,10 @@ def preprocess_video(video_path, output_dir, frames_per_chunk):
         return
 
     remaining_duration = duration - num_chunks * chunk_duration
-    if remaining_duration > 0:
-        print(f"Splitting video into {math.ceil(duration / chunk_duration)+1} chunks")
-    else:
-        print(f"Splitting video into {math.ceil(duration / chunk_duration)} chunks")
+    # if remaining_duration > 0:
+    #     print(f"Splitting video into {math.ceil(duration / chunk_duration)+1} chunks")
+    # else:
+    print(f"Splitting video into {math.ceil(duration / chunk_duration)} chunks")
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
 
@@ -45,7 +45,7 @@ def preprocess_video(video_path, output_dir, frames_per_chunk):
 
     # Split the video into chunks
     for i in range(num_chunks):
-        print(f"Processing chunk {i}/{num_chunks}")
+        print(f"Processing chunk {i}/{math.ceil(duration / chunk_duration)}")
         start_time = i * chunk_duration
         output_path = os.path.join(output_dir, f"{original_name}_{i}.mp4")
         (
@@ -58,7 +58,7 @@ def preprocess_video(video_path, output_dir, frames_per_chunk):
     # Handle the last chunk if there's remaining video
     remaining_duration = duration - num_chunks * chunk_duration
     if remaining_duration > 0:
-        print(f"Processing chunk {num_chunks}/{num_chunks}")
+        print(f"Processing chunk {num_chunks}/{math.ceil(duration / chunk_duration)}")
         start_time = num_chunks * chunk_duration
         output_path = os.path.join(output_dir, f"{original_name}_{num_chunks}.mp4")
         (
