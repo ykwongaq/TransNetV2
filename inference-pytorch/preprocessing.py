@@ -78,14 +78,26 @@ def main(args):
 
     os.makedirs(output_folder, exist_ok=True)
 
+    failing_videos = []
     for video_filename in os.listdir(input_folder):
         print(f"Preprocessing video: {video_filename}")
         video_path = os.path.join(input_folder, video_filename)
         start_time = time.time()
-        preprocess_video(video_path, output_folder, max_frames)
+        try:
+            preprocess_video(video_path, output_folder, max_frames)
+        except Exception as e:
+            print(f"Failed to preprocess {video_filename}: {e}")
+            failing_videos.append(video_filename)
         end_time = time.time()
         print(f"Video preprocessed in {end_time - start_time:.2f} seconds")
     print("All video is processed.")
+
+    if len(failing_videos) > 0:
+        print("Failed to preprocess the following videos:")
+        for video in failing_videos:
+            print(video)
+    else:
+        print("All videos are preprocessed successfully")
 
 
 if __name__ == "__main__":
