@@ -32,7 +32,11 @@ def preprocess_video(video_path, output_dir, frames_per_chunk):
         shutil.copyfile(video_path, output_path)
         return
 
-    print(f"Splitting video into {math.ceil(duration / chunk_duration)} chunks")
+    remaining_duration = duration - num_chunks * chunk_duration
+    if remaining_duration > 0:
+        print(f"Splitting video into {math.ceil(duration / chunk_duration)+1} chunks")
+    else:
+        print(f"Splitting video into {math.ceil(duration / chunk_duration)} chunks")
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
 
