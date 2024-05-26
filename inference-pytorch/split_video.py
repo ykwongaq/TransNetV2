@@ -66,8 +66,6 @@ def main(args):
     output_folder = args.output
     # Clear the output folder
     os.makedirs(output_folder, exist_ok=True)
-    shutil.rmtree(output_folder)
-    os.makedirs(output_folder, exist_ok=True)
 
     model = prepare_model()
 
