@@ -71,9 +71,9 @@ def main(args):
 
     skipped_videos = []
     error_message_path = os.path.join(output_folder, "error_message.txt")
-    if os.path.exists(error_message_path):
-        os.remove(error_message_path)
-    open(error_message_path, "w").close()
+    # if os.path.exists(error_message_path):
+    #     os.remove(error_message_path)
+    # open(error_message_path, "w").close()
 
     progress_bar = tqdm(os.listdir(input_folder))
     for video_name in progress_bar:
