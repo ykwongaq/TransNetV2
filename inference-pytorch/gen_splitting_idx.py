@@ -37,26 +37,44 @@ def predictions_to_scenes(predictions: np.ndarray, threshold: float = 0.5):
 
     return np.array(scenes, dtype=np.int32)
 
+def split_range(start, end, range_limit):
+    ranges = []
+    current_start = start
+    current_end = 0
+    while current_end < end:
+        current_end = min(current_start + range_limit - 1, end)
+        ranges.append((current_start, current_end))
+        current_start = (current_start + current_end) // 2 + 1
+    
+    return ranges
 
-def load_video_frame(frames_folder, frame_height=27, frame_width=48):
+def load_video_frame(frames_folder, frame_height=27, frame_width=48, range=10000):
     # Get the list of frame files and sort them
     frame_files = sorted([f for f in os.listdir(frames_folder) if f.endswith(".jpg")])
     num_frames = len(frame_files)
 
-    # Initialize a tensor to hold the video frames
-    input_video = torch.zeros(
-        1, num_frames, frame_height, frame_width, 3, dtype=torch.uint8
-    )
+    ranges = split_range(0, num_frames-1, range)
 
-    # Load each frame into the tensor
-    for i, frame_file in enumerate(frame_files):
-        frame_path = os.path.join(frames_folder, frame_file)
-        image = Image.open(frame_path).convert("RGB")  # Ensure image is in RGB format
-        image = image.resize((frame_width, frame_height))
-        frame = np.array(image)
-        input_video[0, i] = torch.tensor(frame, dtype=torch.uint8)
+    video_images_list = []
+    for (start_frame, end_frame) in ranges:
+        num_frames_in_range = end_frame - start_frame + 1
 
-    return input_video
+        # Initialize a tensor to hold the video frames
+        video_images = torch.zeros(
+            1, num_frames_in_range, frame_height, frame_width, 3, dtype=torch.uint8
+        )
+
+        frame_files_in_range = frame_files[start_frame:end_frame+1]
+        for i, frame_file in enumerate(frame_files_in_range):
+            frame_path = os.path.join(frames_folder, frame_file)
+            image = Image.open(frame_path).convert("RGB")  # Ensure image is in RGB format
+            image = image.resize((frame_width, frame_height))
+            frame = np.array(image)
+            video_images[0, i] = torch.tensor(frame, dtype=torch.uint8)
+
+        video_images_list.append(video_images)
+
+    return video_images_list, ranges
 
 
 def main(args):
@@ -68,6 +86,8 @@ def main(args):
     os.makedirs(output_folder, exist_ok=True)
 
     model = prepare_model()
+
+    range = args.range
 
     skipped_videos = []
     error_message_path = os.path.join(output_folder, "error_message.txt")
@@ -89,18 +109,26 @@ def main(args):
             continue
 
         progress_bar.set_description(f"Processing {video_name}")
-        frames = load_video_frame(frame_folder)
+        # frames = load_video_frame(frame_folder, range=range)
+        video_images_list, ranges = load_video_frame(frame_folder, range=range)
 
         try:
-            single_frame_pred, _ = model(frames.cuda())
+            output_list = []
+            for video_images, (start_frame, _) in zip(video_images_list, ranges):
+                single_frame_pred, _ = model(video_images.cuda())
 
-            single_frame_pred = torch.sigmoid(single_frame_pred).detach().cpu().numpy()
-            # all_frame_pred = torch.sigmoid(all_frame_pred["many_hot"]).cpu().numpy()
+                single_frame_pred = torch.sigmoid(single_frame_pred).detach().cpu().numpy()
 
-            outputs = predictions_to_scenes(single_frame_pred[0])
+                output = predictions_to_scenes(single_frame_pred[0])
+                output += start_frame
+                output_list.append(output)
+                video_images.cpu()
+                torch.cuda.empty_cache()
 
+            output_np = np.concatenate(output_list, axis=0)
             output_file = os.path.join(output_folder, f"{video_name}.txt")
-            np.savetxt(output_file, outputs, fmt="%d")
+            np.savetxt(output_file, output_np, fmt="%d")
+
         except RuntimeError as e:
             if "out of memory" in str(e):
                 print("CUDA out of memory. Skipping this iteration.")
@@ -110,6 +138,7 @@ def main(args):
                 #     f.write(f"{video_name}: {str(e)}\n")
             else:
                 raise e  # Re-raise the exception if it is not related to CUDA OOM
+        
 
     if len(skipped_videos) > 0:
         print(f"Skipped videos due to CUDA out of memory: {skipped_videos}")
@@ -126,5 +155,6 @@ if __name__ == "__main__":
         default=0.5,
         help="Threshold for scene change detection. Default 0.5",
     )
+    parser.add_argument("--range", type=int, default=1500, help="Range limit")
     args = parser.parse_args()
     main(args)
